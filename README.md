@@ -1,6 +1,6 @@
 #Azure Deployment Use Case!
 
-This is a Page describes the Problem, Approach and Usage of this project. If you are eager to dive into the implementation, check this page.
+This is a Page describes the Problem, Approach and Usage of this project. If you are eager to dive into the implementation, check this page [Implementation](https://github.com/patvin80/AzureDeployment/wiki/Implementation).
 
 ##Assumptions:
 1. You have an Active Subscription with [Windows Azure](http://azure.microsoft.com) 
