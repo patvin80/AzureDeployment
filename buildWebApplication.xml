@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+  <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="CIPublish">
+   
+    <Import Project="$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"/>
+    <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+    <Import Project="$(MSBuildExtensionsPath)\ExtensionPack\4.0\MSBuild.ExtensionPack.tasks"/>
+    <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" />
+    <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v10.0\Web\Microsoft.Web.Publishing.targets"/>
+    <UsingTask TaskName="TransformXml" AssemblyFile="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v10.0\Web\Microsoft.Web.Publishing.Tasks.dll"/>
+   
+    <PropertyGroup>
+      <OutputFolder>$(MSBuildProjectDirectory)\Published</OutputFolder>
+      <CIOutputFolder>C:\Projects\AzurePublishWebsite\build\Published</CIOutputFolder>
+      <ProjectPath>C:\Projects\AzurePublishWebsite\AzurePublishWebsite</ProjectPath>
+      <BuildConfig>Release</BuildConfig>
+      <RevisionNumber></RevisionNumber>
+      <ClientName></ClientName>
+      <ClientDBPassword></ClientDBPassword>
+      <ClientDBUserName></ClientDBUserName>
+      <AzureServer>YOUR_DB_SERVER</AzureServer>
+  </PropertyGroup>
+   
+   
+    <Target Name="Checkout">
+      <RemoveDir Directories="$(MSBuildProjectDirectory)\FreshSources" ContinueOnError="false" />
+      <SvnExport RepositoryPath="SVN_REPO_URL"
+                 LocalPath="$(MSBuildProjectDirectory)\FreshSources"
+                 Revision="$(RevisionNumber)"
+                 Username="SVN_REPO_USERNAME"
+                 Password="SVN_REPO_PASSWORD" >
+        <Output TaskParameter="Revision" PropertyName="RevisionNumber" />
+      </SvnExport>
+   
+      <Message Text="Revision: $(RevisionNumber)"/>
+      <ItemGroup>
+        <SourceFiles Include="$(MSBuildProjectDirectory)\FreshSources\**\*.*" />
+      </ItemGroup>
+      <RemoveDir Directories="$(MSBuildProjectDirectory)\$(RevisionNumber)" ContinueOnError="false" />
+      <Copy SourceFiles="@(SourceFiles)"
+            DestinationFolder="$(MSBuildProjectDirectory)\$(RevisionNumber)\%(RecursiveDir)" />
+      <Time Format="yyyy-MM-dd_hh-mm-ss">
+        <Output TaskParameter="FormattedTime" PropertyName="buildDate" />
+      </Time>
+       
+      <PropertyGroup>
+              <ProjectPath>$(MSBuildProjectDirectory)\$(RevisionNumber)</ProjectPath>
+        </PropertyGroup>
+  </Target>
+   
+   
+  <Target Name="CIPublish" DependsOnTargets="Checkout">
+    <MSBuild Projects="$(ProjectPath)\AzurePublishWebsite.csproj" Targets="Rebuild" Properties="Configuration=$(BuildConfig);" />
+ 
+    <MSBuild Projects="$(ProjectPath)\AzurePublishWebsite.csproj"
+             Properties="Configuration=$(BuildConfig);WebProjectOutputDir=$(OutputFolder);OutDir=$(OutputFolder)\bin"
+             Targets="ResolveReferences;_CopyWebApplication" />
+ 
+    <XmlUpdate
+                  XPath="/configuration/appSettings/add[@key='ClientName']/@value"
+                  XmlFileName="$(OutputFolder)\Web.config"
+                  Value="$(ClientName)" />
+    <XmlUpdate
+        XPath="/configuration/appSettings/add[@key='DBName']/@value"
+        XmlFileName="$(OutputFolder)\Web.config"
+                  Value="$(ClientName)Db" />
+    <XmlUpdate XmlFileName="$(OutputFolder)\Web.config"
+        XPath="configuration/connectionStrings/add[@name='ApplicationServices']/@connectionString"
+        Value="Data Source=Server=tcp:$(AzureServer).database.windows.net,1433;;Initial Catalog=$(ClientName)DB;User ID=$(ClientDBUserName);Password=$(ClientDBPassword)" />                  
+    <ItemGroup>
+      <WebConfigFilesToDelete Include="$(OutputFolder)\Web.*.config"/>
+    </ItemGroup>
+    <Delete Files="@(WebConfigFilesToDelete)" ContinueOnError="true" />
+ 
+    <CreateItem Include="$(OutputFolder)\**\*.*" >
+      <Output ItemName="ZipFiles" TaskParameter="Include"/>
+    </CreateItem>
+    <MSBuild.ExtensionPack.Compression.Zip
+        TaskAction="Create"
+        CompressFiles="@(ZipFiles)"
+        ZipFileName="$(OutputFolder)\..\AzurePkg.zip"
+        RemoveRoot="$(OutputFolder)"
+        CompressionLevel="BestCompression" />
+   
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\$(RevisionNumber)" Condition="'$(RevisionNumber)'!=''" ContinueOnError="true" />
+  </Target>
+   
+</Project>
